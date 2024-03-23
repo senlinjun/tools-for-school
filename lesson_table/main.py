@@ -1,6 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
 from datetime import datetime
-import time, json, ctypes, os, math, re
+import time, json, ctypes, os, math, re, urllib3
 
 WIDTH = 300
 WIDTH_WITHOUT_FRAME = WIDTH - 40
@@ -251,10 +251,46 @@ def generateWallpaper(lesson_img, bg_img, width):
     bg_img.save("./lesson_table/tmp.png")
 
 
+def getHolidays():
+    """
+    获取节假日
+    """
+    if "holidays" not in os.listdir("./lesson_table"):
+        with open("./lesson_table/holidays", "w") as f:
+            json.dump({"update_time": 0, "holiday_data": {}, "weekend_data": {}}, f)
+
+    with open("./lesson_table/holidays", "r") as f:
+        data = json.load(f)
+    if (
+        time.time() - data["update_time"] > 2592000
+    ):  # 距离上一次更新节假日文件过了一个月
+        year = datetime.now().year
+        try:
+            http = urllib3.PoolManager()
+            url = f"https://api.jiejiariapi.com/v1/holidays/{year}"
+            response = http.request("GET", url)
+            holiday_data = json.loads(response.data.decode("utf-8"))
+            url = f"https://api.jiejiariapi.com/v1/weekends/{year}"
+            response = http.request("GET", url)
+            weekend_data = json.loads(response.data.decode("utf-8"))
+            data["update_time"] = time.time()
+            data["holiday_data"] = holiday_data
+            data["weekend_data"] = weekend_data
+            with open("./lesson_table/holidays", "w") as f:
+                json.dump(data, f)
+        except Exception as e:
+            print(e)
+            return {"update_time": 0, "holiday_data": {}, "weekend_data": {}}
+
+    return data
+
+
 def main():
     config = getConfig()
     lessons = getTodaysLesson(config)
     zero_hour = getTodaysZero()
+    holidays = getHolidays()
+
     title = ImageFont.truetype(f'./lesson_table/{config["font"]}', 40)
     content = ImageFont.truetype(f'./lesson_table/{config["font"]}', 30)
     mini_content = ImageFont.truetype(f'./lesson_table/{config["font"]}', 25)
@@ -292,7 +328,7 @@ def main():
     # 获取倒计时并删除已过期的倒计时
     remove_event = []
     for event in config["event"]:
-        days = int((config["event"][event] - getTodaysZero()) / 86400)
+        days = int((config["event"][event][0] - zero_hour) / 86400)
         if days < 0:
             remove_event.append(event)
     for event in remove_event:
@@ -305,69 +341,87 @@ def main():
     # 日期显示的画布大小
     y += 15  # 间距
     y += 55  # 日期所占空间
-    if not "last" in os.listdir("./"):
+    if not "last" in os.listdir("./lesson_table"):
         with open("./lesson_table/last", "w") as f:
             pass
     with open("./lesson_table/last", "r") as f:
         last_table = f.read()
-    if json.dumps(table_for_draw) != last_table:
-        with open("./lesson_table/last", "w") as f:
-            json.dump(table_for_draw, f)
+    if json.dumps(table_for_draw) == last_table:  # 无需更新课程表
+        return
 
-        # 编辑图片
-        img = Image.new("RGB", (WIDTH, y + 30), config["color"])
-        main = ImageDraw.Draw(img)
-        main.rectangle((20, 20, 280, lesson_y + 10), (255, 255, 255))
-        main.rectangle((20, lesson_y + 20, 280, event_y + 10), (255, 255, 255))
-        main.rectangle((20, event_y + 20, 280, y + 10), (255, 255, 255))
-        y = 30
+    with open("./lesson_table/last", "w") as f:
+        json.dump(table_for_draw, f)
 
-        # 绘制标题
-        y += drawTitle(main, config["title"], title, config, y)
+    # 编辑图片
+    img = Image.new("RGB", (WIDTH, y + 30), config["color"])
+    main = ImageDraw.Draw(img)
+    main.rectangle((20, 20, 280, lesson_y + 10), (255, 255, 255))
+    main.rectangle((20, lesson_y + 20, 280, event_y + 10), (255, 255, 255))
+    main.rectangle((20, event_y + 20, 280, y + 10), (255, 255, 255))
+    y = 30
 
-        # 绘制课程表
-        for part in lessons["parts_in_order"]:
-            table_with_font = []
-            for lesson in table_for_draw[part]:
-                head, content_text, highlight = lesson
-                table_with_font.append(
-                    (head, mini_content, content_text, content, highlight)
-                )
-            y += drawPart(main, part, title, table_with_font, config, y)  # 绘制一个part
+    # 绘制标题
+    y += drawTitle(main, config["title"], title, config, y)
 
-        y += 30  # 间距
-
-        # 绘制倒计时
-        for event in config["event"]:
-            days = int((config["event"][event] - getTodaysZero()) / 86400)
-            y += drawFormatText(
-                main, content, config["lang"]["show_event_1"], event, config, 20, y
+    # 绘制课程表
+    for part in lessons["parts_in_order"]:
+        table_with_font = []
+        for lesson in table_for_draw[part]:
+            head, content_text, highlight = lesson
+            table_with_font.append(
+                (head, mini_content, content_text, content, highlight)
             )
-            y += drawFormatText(
-                main,
-                content,
-                config["lang"]["show_event_2"],
-                str(days),
-                config,
-                20,
-                y,
-                2,
-                WIDTH_WITHOUT_FRAME,
-            )
+        y += drawPart(main, part, title, table_with_font, config, y)  # 绘制一个part
 
-        y += 20  # 间距
+    y += 30  # 间距
+
+    # 绘制倒计时
+    for event in config["event"]:
+        days = int((config["event"][event][0] - zero_hour) / 86400)
+        if config["event"][event][1]:  # 忽略节假日
+            for date in holidays["holiday_data"]:
+                datetime_obj = datetime.strptime(date, "%Y-%m-%d")
+                timestamp = datetime_obj.timestamp()
+                if (
+                    timestamp >= zero_hour
+                    and timestamp < config["event"][event][0]
+                    and holidays["holiday_data"][date]["isOffDay"]
+                ):
+                    days -= 1
+        if config["event"][event][2]:  # 忽略周末
+            for date in holidays["weekend_data"]:
+                datetime_obj = datetime.strptime(date, "%Y-%m-%d")
+                timestamp = datetime_obj.timestamp()
+                if timestamp >= zero_hour and timestamp < config["event"][event][0]:
+                    days -= 1
+        y += drawFormatText(
+            main, content, config["lang"]["show_event_1"], event, config, 20, y
+        )
         y += drawFormatText(
             main,
-            mini_content,
-            config["lang"]["show_date"],
-            (str(getWeek(config)), config["lang"][WEEKDAY[getWeekday()]]),
+            content,
+            config["lang"]["show_event_2"],
+            str(days),
             config,
             20,
             y,
-            1,
+            2,
             WIDTH_WITHOUT_FRAME,
         )
 
-        bg_img = Image.open("./lesson_table/background.png")
-        generateWallpaper(img, bg_img, config["width"])
-        setWallpaper(f"{os.getcwd()}\\lesson_table\\tmp.png")
+    y += 20  # 间距
+    y += drawFormatText(
+        main,
+        mini_content,
+        config["lang"]["show_date"],
+        (str(getWeek(config)), config["lang"][WEEKDAY[getWeekday()]]),
+        config,
+        20,
+        y,
+        1,
+        WIDTH_WITHOUT_FRAME,
+    )
+
+    bg_img = Image.open("./lesson_table/background.png")
+    generateWallpaper(img, bg_img, config["width"])
+    setWallpaper(f"{os.getcwd()}\\lesson_table\\tmp.png")
