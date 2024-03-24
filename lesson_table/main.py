@@ -147,6 +147,13 @@ def getTodaysLesson(config):
             parts.remove(part)
     lessons["parts_in_order"] = [words[part] for part in parts]
 
+    # 预处理调课 将今天的调课提取出来
+    zero = getTodaysZero()
+    temporary_transfer_of_lesson = []
+    for lesson in config["temporary_transfer_of_lesson"]:
+        if lesson[0] == zero:
+            temporary_transfer_of_lesson.append(lesson)
+
     lessons["lessons"] = {}  # 处理课程
     for part in todays_lesson_table:
         lessons["lessons"][words[part]] = []
@@ -160,6 +167,10 @@ def getTodaysLesson(config):
                     content = odd_even[1]
                 else:  # 单周
                     content = odd_even[0]
+            for lesson in temporary_transfer_of_lesson: # 检查是否调课
+                if lesson[1] == part and lesson[2] == i-1:
+                    head = lesson[3]
+                    content = lesson[4]
             lessons["lessons"][words[part]].append(
                 (beginning, ending, words[head], words[content])
             )
@@ -312,8 +323,6 @@ def main():
                 highlight = True
             part_draw.append((part_lesson[i][2], part_lesson[i][3], highlight))
         table_for_draw[part] = part_draw
-    for part in remove_parts:
-        lessons["parts_in_order"].remove(part)
     # 计算画布大小
     y = 90
     lesson_y = 90
@@ -364,7 +373,7 @@ def main():
     y += drawTitle(main, config["title"], title, config, y)
 
     # 绘制课程表
-    for part in lessons["parts_in_order"]:
+    for part in table_for_draw:
         table_with_font = []
         for lesson in table_for_draw[part]:
             head, content_text, highlight = lesson
