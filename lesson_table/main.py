@@ -167,8 +167,8 @@ def getTodaysLesson(config):
                     content = odd_even[1]
                 else:  # 单周
                     content = odd_even[0]
-            for lesson in temporary_transfer_of_lesson: # 检查是否调课
-                if lesson[1] == part and lesson[2] == i-1:
+            for lesson in temporary_transfer_of_lesson:  # 检查是否调课
+                if lesson[1] == part and lesson[2] == i - 1:
                     head = lesson[3]
                     content = lesson[4]
             lessons["lessons"][words[part]].append(
@@ -387,22 +387,29 @@ def main():
     # 绘制倒计时
     for event in config["event"]:
         days = int((config["event"][event][0] - zero_hour) / 86400)
+        flags = []  # 不需要计算的日期
         if config["event"][event][1]:  # 忽略节假日
             for date in holidays["holiday_data"]:
+                if date in flags:  # 跳过不需要计算的日期
+                    continue
                 datetime_obj = datetime.strptime(date, "%Y-%m-%d")
                 timestamp = datetime_obj.timestamp()
-                if (
-                    timestamp >= zero_hour
-                    and timestamp < config["event"][event][0]
-                    and holidays["holiday_data"][date]["isOffDay"]
-                ):
-                    days -= 1
+                if timestamp >= zero_hour and timestamp < config["event"][event][0]:
+                    if holidays["holiday_data"][date]["isOffDay"]:
+                        days -= 1
+                    flags.append(date)
+                    # 如果是休息日(isOffDay为True)则已计算过 不需要重复计算
+                    # 如果不是休息日(False)则需要调休 不需要计算为节假日或周末
+
         if config["event"][event][2]:  # 忽略周末
             for date in holidays["weekend_data"]:
+                if date in flags:  # 跳过不需要计算的日期
+                    continue
                 datetime_obj = datetime.strptime(date, "%Y-%m-%d")
                 timestamp = datetime_obj.timestamp()
                 if timestamp >= zero_hour and timestamp < config["event"][event][0]:
                     days -= 1
+                    flags.append(date)
         y += drawFormatText(
             main, content, config["lang"]["show_event_1"], event, config, 20, y
         )

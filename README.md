@@ -10,6 +10,9 @@
 - 快速批注
 
 ## 更新日志
+24/4/6
+- [lesson_table](./lesson_table/README/README.md#更新日志)
+
 24/3/24
 - [lesson_table](./lesson_table/README/README.md#更新日志)
 
