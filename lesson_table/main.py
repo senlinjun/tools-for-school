@@ -50,18 +50,18 @@ def drawLesson(main, head, head_font, content, content_font, highlight, config, 
     if highlight:
         main.rectangle((40, y, 80, y + 40), color)
         main.text(
-            (40 + int((40 - head_length) / 2), y + 5),
+            (40 + int((40 - head_length) / 2), y),
             head,
             fill=(255, 255, 255),
             font=head_font,
         )
     else:
         main.text(
-            (40 + int((40 - head_length) / 2), y + 5), head, fill=color, font=head_font
+            (40 + int((40 - head_length) / 2), y), head, fill=color, font=head_font
         )
     main.rectangle((90, y, WIDTH_WITHOUT_FRAME, y + 40), color)
     main.text(
-        (90 + int((170 - content_length) / 2), y + 5),
+        (90 + int((170 - content_length) / 2), y),
         content,
         fill=(255, 255, 255),
         font=content_font,
@@ -79,7 +79,6 @@ def drawPart(main, sub_title, sub_title_font, lessons: list, config, y):
     """
     绘制一个part
     """
-    color = config["color"]
     drawSubTitle(main, sub_title, sub_title_font, config, y)
     for i in range(len(lessons)):
         lesson = lessons[i]
@@ -216,16 +215,16 @@ def drawFormatText(main, font, text, args, config, x1, y, align=0, x2=0):
     for i in range(len(highlight_blocks)):  # 绘制文字
         normal_block = normal_blocks[i]  # 普通文字
         highlight_block = highlight_blocks[i]
-        main.text((x, y + 5), normal_block, fill=config["color"], font=font)
+        main.text((x, y), normal_block, fill=config["color"], font=font)
         x += font.getlength(normal_block)
 
         length = font.getlength(highlight_block)  # 高亮文字
         main.rectangle((x, y, x + length + 10, y + 40), config["color"])
-        main.text((x + 5, y + 5), highlight_block, fill=(255, 255, 255), font=font)
+        main.text((x + 5, y), highlight_block, fill=(255, 255, 255), font=font)
         x += length + 10
 
     main.text(
-        (x, y + 5), normal_blocks[-1], fill=config["color"], font=font
+        (x, y), normal_blocks[-1], fill=config["color"], font=font
     )  # 加上最后一段
 
     return 55  # 返回纵向(即y轴)占用空间
