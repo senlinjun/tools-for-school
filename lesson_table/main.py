@@ -135,7 +135,6 @@ def getTodaysLesson(config):
     weekday = getWeekday()
     odd_even_week = int(getWeek(config)) % 2
 
-    words = config["lang"]
     todays_lesson_table = config["lesson_table"][weekday]
     lessons = {}
 
@@ -144,7 +143,7 @@ def getTodaysLesson(config):
     for part in config["parts_in_order"]:
         if part not in todays_lesson_table.keys():
             parts.remove(part)
-    lessons["parts_in_order"] = [words[part] for part in parts]
+    lessons["parts_in_order"] = [part for part in parts]
 
     # 预处理调课 将今天的调课提取出来
     zero = getTodaysZero()
@@ -155,8 +154,8 @@ def getTodaysLesson(config):
 
     lessons["lessons"] = {}  # 处理课程
     for part in todays_lesson_table:
-        lessons["lessons"][words[part]] = []
-        lessons["lessons"][words[part]].append(todays_lesson_table[part][0])
+        lessons["lessons"][part] = []
+        lessons["lessons"][part].append(todays_lesson_table[part][0])
         for i in range(1, len(todays_lesson_table[part])):
             lesson = todays_lesson_table[part][i]
             beginning, ending, head, content = lesson
@@ -170,8 +169,8 @@ def getTodaysLesson(config):
                 if lesson[1] == part and lesson[2] == i - 1:
                     head = lesson[3]
                     content = lesson[4]
-            lessons["lessons"][words[part]].append(
-                (beginning, ending, words[head], words[content])
+            lessons["lessons"][part].append(
+                (beginning, ending, head, content)
             )
 
     return lessons
@@ -307,12 +306,10 @@ def main():
 
     last_table = []
     table_for_draw = {}
-    remove_parts = []
     for part in lessons["parts_in_order"]:
         part_lesson = lessons["lessons"][part]
         t = time.time() - zero_hour
         if t < part_lesson[0][0] or t > part_lesson[0][1]:
-            remove_parts.append(part)
             continue
         part_draw = []
         for i in range(1, len(part_lesson)):
@@ -354,6 +351,7 @@ def main():
             pass
     with open("./lesson_table/last", "r") as f:
         last_table = f.read()
+
     if json.dumps(table_for_draw) == last_table:  # 无需更新课程表
         return
 
@@ -410,12 +408,12 @@ def main():
                     days -= 1
                     flags.append(date)
         y += drawFormatText(
-            main, content, config["lang"]["show_event_1"], event, config, 20, y
+            main, content, config["format"]["show_event_1"], event, config, 20, y
         )
         y += drawFormatText(
             main,
             content,
-            config["lang"]["show_event_2"],
+            config["format"]["show_event_2"],
             str(days),
             config,
             20,
@@ -428,8 +426,8 @@ def main():
     y += drawFormatText(
         main,
         mini_content,
-        config["lang"]["show_date"],
-        (str(getWeek(config)), config["lang"][WEEKDAY[getWeekday()]]),
+        config["format"]["show_date"],
+        (str(getWeek(config)), config["format"][WEEKDAY[getWeekday()]]),
         config,
         20,
         y,
@@ -440,3 +438,6 @@ def main():
     bg_img = Image.open("./lesson_table/background.png")
     generateWallpaper(img, bg_img, config["width"])
     setWallpaper(f"{os.getcwd()}\\lesson_table\\tmp.png")
+
+if __name__ == "__main__":
+    main()
